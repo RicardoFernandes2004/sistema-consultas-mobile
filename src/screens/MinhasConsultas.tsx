@@ -1,10 +1,7 @@
 import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-} from "react-native";
+import { View, Text } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { styles } from "../styles/minhasConsultas.styles";
 // Componente não utilizado na versão simplificada
 
 type MinhasConsultasProps = {
@@ -26,24 +23,3 @@ export default function MinhasConsultas({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  header: {
-    padding: 20,
-    alignItems: "center",
-  },
-  titulo: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#2196F3",
-    marginBottom: 8,
-  },
-  subtitulo: {
-    fontSize: 14,
-    color: "#666",
-  },
-});
