@@ -6,7 +6,12 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Consulta } from "../types";
-import { formatarData, formatarHorario, obterCorStatus, obterTextoStatus } from "../utils/formatters";
+import {
+  formatarData,
+  formatarHorario,
+  obterCorStatus,
+  obterTextoStatus,
+} from "../utils/formatters";
 
 type ConsultaCardProps = {
   consulta: Consulta;
@@ -107,10 +112,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginVertical: 8,
     marginHorizontal: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
     elevation: 3,
   },
   statusBadge: {
@@ -165,10 +167,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
   },
   botaoCancelar: {
-    backgroundColor: "#F44336",
+    backgroundColor: "#f44336",
   },
   botaoDetalhes: {
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: "#79059C",
   },

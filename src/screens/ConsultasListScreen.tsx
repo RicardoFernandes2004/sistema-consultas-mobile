@@ -1,19 +1,23 @@
 /**
  * ConsultasListScreen - Lista de Consultas
- * Exibe todas as consultas do usuário com filtros
+ * Exibe consultas filtradas por usuário (paciente vê só suas, admin vê todas)
  */
 
 import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
+  StyleSheet,
   FlatList,
   TouchableOpacity,
+  RefreshControl,
+  Alert,
 } from "react-native";
-import { Consulta, StatusConsulta } from "../types";
+import { useAuth } from "../contexts/AuthContext";
+import consultasService from "../services/consultasService";
+import { Consulta } from "../interfaces/consulta";
+import { StatusConsulta } from "../types/statusConsulta";
 import { ConsultaCard, Loading, EmptyState } from "../components";
-import { consultasService } from "../services/consultasService";
-import { styles } from "../styles/consultasListScreen.styles";
 
 type ConsultasListScreenProps = {
   navigation: any;
@@ -22,10 +26,12 @@ type ConsultasListScreenProps = {
 export default function ConsultasListScreen({
   navigation,
 }: ConsultasListScreenProps) {
+  const { usuario, isAdmin } = useAuth();
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filtroAtivo, setFiltroAtivo] = useState<StatusConsulta | "todas">(
-    "todas"
+    "todas",
   );
 
   useEffect(() => {
@@ -35,31 +41,60 @@ export default function ConsultasListScreen({
   async function carregarConsultas() {
     setLoading(true);
     try {
-      const dados = await consultasService.listarConsultas();
+      const dados = await consultasService.listarConsultas(
+        usuario?.id,
+        isAdmin(),
+      );
       setConsultas(dados);
     } catch (error) {
       console.error("Erro ao carregar consultas:", error);
+      Alert.alert("Erro", "Não foi possível carregar as consultas");
     } finally {
       setLoading(false);
     }
   }
 
+  async function onRefresh() {
+    setRefreshing(true);
+    await carregarConsultas();
+    setRefreshing(false);
+  }
+
   async function handleConfirmar(id: number) {
     try {
-      await consultasService.confirmarConsulta(id);
+      await consultasService.confirmarConsulta(id, usuario?.id, isAdmin());
+      Alert.alert("Sucesso", "Consulta confirmada!");
       carregarConsultas();
-    } catch (error) {
-      console.error("Erro ao confirmar consulta:", error);
+    } catch (error: any) {
+      Alert.alert("Erro", error.message || "Erro ao confirmar consulta");
     }
   }
 
   async function handleCancelar(id: number) {
-    try {
-      await consultasService.cancelarConsulta(id);
-      carregarConsultas();
-    } catch (error) {
-      console.error("Erro ao cancelar consulta:", error);
-    }
+    Alert.alert(
+      "Cancelar Consulta",
+      "Deseja realmente cancelar esta consulta?",
+      [
+        { text: "Não", style: "cancel" },
+        {
+          text: "Sim, cancelar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await consultasService.cancelarConsulta(
+                id,
+                usuario?.id,
+                isAdmin(),
+              );
+              Alert.alert("Sucesso", "Consulta cancelada");
+              carregarConsultas();
+            } catch (error: any) {
+              Alert.alert("Erro", error.message || "Erro ao cancelar consulta");
+            }
+          },
+        },
+      ],
+    );
   }
 
   function handleDetalhes(id: number) {
@@ -77,13 +112,20 @@ export default function ConsultasListScreen({
 
   return (
     <View style={styles.container}>
+      {/* Header com Info do Usuário */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>
+          {isAdmin() ? "📋 Todas as Consultas" : "📋 Minhas Consultas"}
+        </Text>
+        <Text style={styles.headerSubtitle}>
+          {consultasFiltradas.length} consulta(s) encontrada(s)
+        </Text>
+      </View>
+
       {/* Filtros */}
       <View style={styles.filtros}>
         <TouchableOpacity
-          style={[
-            styles.filtro,
-            filtroAtivo === "todas" && styles.filtroAtivo,
-          ]}
+          style={[styles.filtro, filtroAtivo === "todas" && styles.filtroAtivo]}
           onPress={() => setFiltroAtivo("todas")}
         >
           <Text
@@ -132,31 +174,87 @@ export default function ConsultasListScreen({
       </View>
 
       {/* Lista de Consultas */}
-      <FlatList
-        data={consultasFiltradas}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <ConsultaCard
-            consulta={item}
-            onConfirmar={handleConfirmar}
-            onCancelar={handleCancelar}
-            onDetalhes={handleDetalhes}
-          />
-        )}
-        contentContainerStyle={
-          consultasFiltradas.length === 0 && styles.emptyContainer
-        }
-        ListEmptyComponent={
-          <EmptyState
-            mensagem={
-              filtroAtivo === "todas"
-                ? "Você ainda não possui consultas"
-                : `Nenhuma consulta ${filtroAtivo}`
-            }
-            icone="📅"
-          />
-        }
-      />
+      {consultasFiltradas.length === 0 ? (
+        <EmptyState
+          icone="📅"
+          mensagem={
+            filtroAtivo === "todas"
+              ? "Nenhuma consulta encontrada"
+              : `Nenhuma consulta ${filtroAtivo}`
+          }
+        />
+      ) : (
+        <FlatList
+          data={consultasFiltradas}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <ConsultaCard
+              consulta={item}
+              onConfirmar={() => handleConfirmar(item.id)}
+              onCancelar={() => handleCancelar(item.id)}
+              onDetalhes={() => handleDetalhes(item.id)}
+            />
+          )}
+          contentContainerStyle={styles.lista}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f5f5f5",
+  },
+  header: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: "#666",
+  },
+  filtros: {
+    flexDirection: "row",
+    padding: 16,
+    gap: 8,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  filtro: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#f5f5f5",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  filtroAtivo: {
+    backgroundColor: "#79059C",
+    borderColor: "#79059C",
+  },
+  filtroTexto: {
+    color: "#666",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  filtroTextoAtivo: {
+    color: "#fff",
+  },
+  lista: {
+    padding: 16,
+  },
+});
